@@ -1,6 +1,11 @@
 import {createBoard, playMove } from "../connect4.js"
 
-
+function initGame(websocket) {
+    websocket.addEventListener("open", () => {
+        const event = { type: "init" };
+        websocket.send(JSON.stringify(event));
+    });
+}
 function sendMoves(board, websocket) {
     // send play event on click for move in clicked col
     board.addEventListener("click", ({target}) => {
@@ -16,16 +21,6 @@ function sendMoves(board, websocket) {
         websocket.send(JSON.stringify(event));
     });
 }
-
-window.addEventListener("DOMContentLoaded", () => {
-    // Initialize the UI
-    const board = document.querySelector(".board");
-    createBoard(board);
-    // open websocket connection and register event handlers
-    const websocket = new WebSocket("ws://localhost:8001/");
-    receiveMoves(board, websocket);
-    sendMoves(board, websocket);
-})
 
 function showMessage(message) {
     window.setTimeout(() => window.alert(message, 50));
@@ -46,9 +41,24 @@ function receiveMoves(board, websocket) {
             case "error":
                 showMessage(event.message);
                 break;
+            case "init":
+                // create link for inviting second player
+                document.querySelector(".join").href = "?join=" + event.join;
+                break;
             default:
                 throw new Error('Unsupported event type: ${event.type}.');
 
         }
     });
 }
+
+window.addEventListener("DOMContentLoaded", () => {
+    // Initialize the UI
+    const board = document.querySelector(".board");
+    createBoard(board);
+    // open websocket connection and register event handlers
+    const websocket = new WebSocket("ws://localhost:8001/");
+    initGame(websocket);
+    receiveMoves(board, websocket);
+    sendMoves(board, websocket);
+})
