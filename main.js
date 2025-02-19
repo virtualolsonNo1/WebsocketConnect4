@@ -2,7 +2,16 @@ import {createBoard, playMove } from "../connect4.js"
 
 function initGame(websocket) {
     websocket.addEventListener("open", () => {
-        const event = { type: "init" };
+        // send init event according to who is connecting
+        const params = new URLSearchParams(window.location.search);
+
+        let event = { type: "init" };
+        if (params.has("join")) {
+            // second player joins existing game
+            event.join = params.get("join");
+        } else {
+            // first player starts a new game
+        }
         websocket.send(JSON.stringify(event));
     });
 }

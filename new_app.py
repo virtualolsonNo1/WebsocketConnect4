@@ -10,6 +10,31 @@ import json
 
 JOIN = {}
 
+async def error(websocket, message):
+    event = {
+        "type": "error",
+        "message": message,
+    }
+    await websocket.send(json.dumps(event))
+
+async def join(websocket, join_key):
+    # Find connect Four game
+    try:
+        game, connected = JOIN[join_key]
+    except KeyError:
+        await error(websocket, "Game not found.")
+        return
+
+    # register to receive moves from the game
+    connected.add(websocket)
+    try:
+        #temporary - for testing
+        print("second player joined game", id(game))
+        async for message in websocket:
+            print("Second player sent", message)
+    finally:
+        connected.remove(websocket)
+
 async def start(websocket):
     # initialize connect 4 game, set of websocket connections receiving game moves, and secret access token
     game = Connect4()
@@ -39,6 +64,13 @@ async def handler(websocket):
     message = await websocket.recv()
     event = json.loads(message)
     assert event["type"] == "init"
+
+    if "join" in event:
+        # second player joins existing game
+        await join(websocket, event["join"])
+    else:
+        # first player starts a new game
+        await start(websocket)
 
     # first player starts a new game
     await start(websocket)
