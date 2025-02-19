@@ -13,12 +13,21 @@ async def handler(websocket):
     async for message in websocket:
         print(message)
         message = json.loads(message)
+
+        # if message type is play, handle accordingly
         if message["type"] == "play":
             player = PLAYER2 if len(game.moves) % 2 else PLAYER1
-            print(game.last_player)
+            
             print(player)
             print(len(game.moves))
-            row = game.play(player, message["column"])
+
+            # check for bad move, ignoring it if that's the case and waiting for another move
+            try:
+                row = game.play(player, message["column"])
+            except ValueError as e:
+                print(e)
+                continue
+
             event = {
                 "type": "play",
                 "player": player,
