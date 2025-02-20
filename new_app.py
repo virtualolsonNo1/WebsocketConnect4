@@ -28,10 +28,9 @@ async def join(websocket, join_key):
     # register to receive moves from the game
     connected.add(websocket)
     try:
-        #temporary - for testing
+        # after second player has joined game, wait for messages from them regarding moves
         print("second player joined game", id(game))
-        async for message in websocket:
-            print("Second player sent", message)
+        await play(websocket, game, PLAYER2, connected)
     finally:
         connected.remove(websocket)
 
@@ -51,10 +50,9 @@ async def start(websocket):
         }
         await websocket.send(json.dumps(event))
 
-        #temporary for testing
+        # after player 1 has joined game, wait for 
         print("first player started game", id(game))
-        async for message in websocket:
-            print("first player sent", message)
+        await play(websocket, game, PLAYER1, connected)
 
     finally:
         del JOIN[join_key]
@@ -76,6 +74,49 @@ async def handler(websocket):
     await start(websocket)
             
 
+async def play(websocket, game, player, connected):
+    async for message in websocket:
+        print(message)
+        message = json.loads(message)
+
+        # if message type is play, handle accordingly
+        if message["type"] == "play":
+            player_turn = PLAYER2 if len(game.moves) % 2 else PLAYER1
+            if (player != player_turn):
+                print("NOT THIS PLAYER'S TURN!!!!!!!!!!!!!")
+                continue
+            
+            
+            print(player)
+            print(len(game.moves))
+
+            # check for bad move, ignoring it if that's the case and waiting for another move
+            try:
+                row = game.play(player, message["column"])
+            except ValueError as e:
+                print(e)
+                continue
+
+            event = {
+                "type": "play",
+                "player": player,
+                "column": message["column"],
+                "row": row,
+            }
+
+            await websocket.send(json.dumps(event))
+            for ws in connected:
+                if ws != websocket:
+                    await ws.send(json.dumps(event))
+            await asyncio.sleep(0.5)
+            
+            if game.winner is not None:
+                event = {
+                    "type": "win",
+                    "player": game.last_player,
+                }
+            
+            await websocket.send(json.dumps(event))
 
 
 async def main():
