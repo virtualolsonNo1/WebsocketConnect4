@@ -9,6 +9,7 @@ from websockets.asyncio.server import serve
 import json
 
 JOIN = {}
+WATCH = {}
 
 async def error(websocket, message):
     event = {
@@ -42,11 +43,17 @@ async def start(websocket):
     join_key = secrets.token_urlsafe(12)
     JOIN[join_key] = game, connected
 
+    watch_key = secrets.token_urlsafe(12)
+    WATCH[watch_key] = game, connected
+
+    print(watch_key)
+
     try:
         # send secret access token to browser of first player where it'll be used for buliidng a join link
         event = {
             "type": "init",
             "join": join_key,
+            "watch": watch_key,
         }
         await websocket.send(json.dumps(event))
 
@@ -56,6 +63,7 @@ async def start(websocket):
 
     finally:
         del JOIN[join_key]
+        del WATCH[watch_key]
 
 async def handler(websocket):
     # receive and parse init event from UI
@@ -66,6 +74,9 @@ async def handler(websocket):
     if "join" in event:
         # second player joins existing game
         await join(websocket, event["join"])
+    elif "watch" in event:
+        # person wants to watch
+        await watch(websocket, event["watch"])
     else:
         # first player starts a new game
         await start(websocket)
@@ -117,6 +128,28 @@ async def play(websocket, game, player, connected):
                 }
             
             await websocket.send(json.dumps(event))
+
+async def watch(websocket, watch_key):
+
+    try:
+        game, connected = WATCH[watch_key]
+    except KeyError:
+        await error(websocket, "Game not found.")
+        return
+
+    # register to receive moves from the game
+    connected.add(websocket)
+
+    # TODO: FIGURE OUT IF THIS WORKS RIGHT!!!
+    count = 0
+    for move in game.moves:
+        player_turn = PLAYER2 if len(game.moves) % 2 else PLAYER1
+        play(websocket, game, player_turn, connected)
+
+    try:
+        await websocket.wait_closed()
+    finally:
+        connected.remove(websocket)
 
 
 async def main():
